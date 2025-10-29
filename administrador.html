@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGPO - Panel de Gestión</title>
+    <!-- Carga de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <!-- Iconos Phosphor Icons -->
+    <script src="https://unpkg.com/phosphor-icons"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Fondo suave */
+        }
+        .color-primary {
+            background-color: #e53e3e; /* Rojo Tailwind 600 */
+        }
+        .text-primary {
+            color: #e53e3e; /* Rojo Tailwind 600 */
+        }
+        /* Estilo para el modo de visualización de turnos */
+        .schedule-grid {
+            display: grid;
+            grid-template-columns: 150px repeat(7, 1fr); /* Nombre + 7 días */
+        }
+        .schedule-day-header {
+            text-align: center;
+            padding: 8px 4px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #4B5563;
+        }
+        .schedule-slot {
+            height: 100%;
+            min-height: 40px;
+            padding: 2px;
+            border-left: 1px dashed #e5e7eb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .shift-block {
+            padding: 4px 6px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            color: white;
+            font-weight: 500;
+            cursor: pointer;
+            width: 90%;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            transition: transform 0.1s;
+        }
+        .shift-block:hover {
+            transform: scale(1.03);
+        }
+        .shift-unassigned {
+            cursor: pointer;
+            color: #9CA3AF;
+            font-size: 1.5rem;
+            transition: color 0.15s;
+        }
+        .shift-unassigned:hover {
+            color: #3B82F6; /* Azul al pasar el ratón */
+        }
+        /* Estilo activo de la pestaña */
+        .tab-active {
+            border-bottom: 3px solid #e53e3e;
+            color: #e53e3e;
+            font-weight: 600;
+        }
+        /* Estilo del modal */
+        .modal {
+            background-color: rgba(0, 0, 0, 0.6);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased">
+
+    <!-- CABECERA -->
+    <header class="bg-white shadow-md sticky top-0 z-20">
+        <div class="container mx-auto px-4 sm:px-6 py-3 flex justify-between items-center">
+            <div class="text-xl font-extrabold tracking-tight">
+                <span class="text-black">SGPO</span> <span class="text-primary">Gestión</span>
+            </div>
+            
+            <div class="flex items-center space-x-4">
+                <div class="hidden sm:block text-sm text-gray-600 font-medium">
+                    Gerente, <span id="userName">Sofía L.</span>
+                </div>
+                <div class="w-10 h-10 bg-indigo-500 rounded-full flex items-center justify-center text-lg font-bold text-white border-2 border-primary">
+                    SL
+                </div>
+                <button 
+                    id="logoutBtn"
+                    class="text-gray-500 hover:text-primary transition duration-150"
+                    title="Cerrar Sesión"
+                    onclick="showMessageModal('Cerrar Sesión', 'Funcionalidad de Cerrar Sesión simulada.')"
+                >
+                    <i class="ph-bold ph-sign-out text-2xl"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <main class="flex-grow p-4 sm:p-6 lg:p-8">
+        <div class="max-w-6xl mx-auto">
+            
+            <!-- TÍTULO Y INFORMACIÓN RÁPIDA (KPIs de Alto Nivel) -->
+            <div class="bg-white p-6 rounded-xl shadow-lg mb-6">
+                <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 mb-1">Panel de Control de Personal</h1>
+                <p class="text-gray-500 text-sm">Resumen semanal y herramientas de programación.</p>
+                <div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="bg-indigo-50 p-3 rounded-lg text-center">
+                        <i class="ph-bold ph-users-three text-2xl text-indigo-600"></i>
+                        <p class="text-xs text-gray-600 mt-1">Total de Operativos</p>
+                        <p class="text-xl font-bold text-indigo-800">25</p>
+                    </div>
+                    <div class="bg-blue-50 p-3 rounded-lg text-center">
+                        <i class="ph-bold ph-calendar-blank text-2xl text-blue-600"></i>
+                        <p class="text-xs text-gray-600 mt-1">Turnos Programados (Semana)</p>
+                        <p class="text-xl font-bold text-blue-800">72</p>
+                    </div>
+                    <div class="bg-green-50 p-3 rounded-lg text-center">
+                        <i class="ph-bold ph-chart-line-up text-2xl text-green-600"></i>
+                        <p class="text-xs text-gray-600 mt-1">Tasa de Cumplimiento</p>
+                        <p class="text-xl font-bold text-green-800">97.4%</p>
+                    </div>
+                    <div class="bg-yellow-50 p-3 rounded-lg text-center">
+                        <i class="ph-bold ph-hourglass-high text-2xl text-yellow-600"></i>
+                        <p class="text-xs text-gray-600 mt-1">Alertas Pendientes</p>
+                        <p class="text-xl font-bold text-yellow-800">2</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NAVEGACIÓN DE PESTAÑAS -->
+            <div class="bg-white rounded-xl shadow-lg">
+                <div class="flex border-b border-gray-200 p-2 sm:p-0">
+                    <button 
+                        class="tab-btn w-1/4 py-3 sm:px-6 flex justify-center items-center text-gray-600 hover:text-primary transition duration-150 tab-active" 
+                        data-target="scheduling"
+                    >
+                        <i class="ph-bold ph-table text-xl sm:mr-2"></i> <span class="hidden sm:inline">Programación Semanal</span>
+                    </button>
+                    <button 
+                        class="tab-btn w-1/4 py-3 sm:px-6 flex justify-center items-center text-gray-600 hover:text-primary transition duration-150" 
+                        data-target="kpis"
+                    >
+                        <i class="ph-bold ph-chart-pie-slice text-xl sm:mr-2"></i> <span class="hidden sm:inline">Indicadores de Equipo</span>
+                    </button>
+                    <button 
+                        class="tab-btn w-1/4 py-3 sm:px-6 flex justify-center items-center text-gray-600 hover:text-primary transition duration-150" 
+                        data-target="processes"
+                    >
+                        <i class="ph-bold ph-list-numbers text-xl sm:mr-2"></i> <span class="hidden sm:inline">Gestión de Procesos</span>
+                    </button>
+                    <button 
+                        class="tab-btn w-1/4 py-3 sm:px-6 flex justify-center items-center text-gray-600 hover:text-primary transition duration-150" 
+                        data-target="chat"
+                    >
+                        <i class="ph-bold ph-chats text-xl sm:mr-2"></i> <span class="hidden sm:inline">Comunicaciones</span>
+                    </button>
+                </div>
+                
+                <!-- CONTENIDO DE LAS PESTAÑAS -->
+                <div class="p-4 sm:p-6">
+                    <!-- PESTAÑA 1: PROGRAMACIÓN SEMANAL -->
+                    <div id="scheduling" class="tab-content">
+                        <div class="flex flex-col sm:flex-row justify-between items-center mb-4">
+                            <h2 class="text-xl font-bold text-gray-800 mb-2 sm:mb-0 flex items-center">
+                                <i class="ph-bold ph-calendar-check text-primary mr-2"></i> Asignación de Turnos (Semana 42)
+                            </h2>
+                            <button 
+                                class="color-primary text-white py-2 px-4 rounded-lg text-sm hover:bg-red-700 transition duration-150 flex items-center"
+                                onclick="showMessageModal('Programación Avanzada', 'Funcionalidad para generar turnos masivos o aplicar plantillas.')"
+                            >
+                                <i class="ph-bold ph-plus-circle text-lg mr-2"></i> Programar Masivamente
+                            </button>
+                        </div>
+                        
+                        <!-- VISUALIZADOR SEMANAL -->
+                        <div class="overflow-x-auto rounded-lg border border-gray-200 shadow-inner">
+                            <div id="scheduleContainer" class="schedule-grid min-w-[700px]">
+                                <!-- Encabezados de Días (Inyectados por JS) -->
+                            </div>
+                        </div>
+
+                        <div class="mt-4 p-3 bg-gray-50 rounded-lg text-sm text-gray-600 border border-gray-200">
+                             <p><strong>Leyenda:</strong> Los colores indican el cliente o tipo de turno. Haz clic en un espacio vacío para asignar un turno.</p>
+                             <div class="flex flex-wrap gap-4 mt-2">
+                                <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-blue-500 mr-2"></span> Distribuidora Alfa</span>
+                                <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-teal-500 mr-2"></span> Supermercados Beta</span>
+                                <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-purple-500 mr-2"></span> Comercializadora Gamma</span>
+                                <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-gray-400 mr-2"></span> Libre / Reserva</span>
+                             </div>
+                        </div>
+                    </div>
+
+                    <!-- PESTAÑA 2: INDICADORES DE EQUIPO -->
+                    <div id="kpis" class="tab-content hidden">
+                        <h2 class="text-xl font-bold mb-6 flex items-center text-gray-800">
+                            <i class="ph-bold ph-chart-bar text-primary mr-2"></i> Indicadores Clave de Rendimiento del Equipo
+                        </h2>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                            <!-- KPI: PUNTUALIDAD DEL EQUIPO -->
+                            <div class="bg-white p-5 rounded-xl shadow border border-gray-200">
+                                <p class="text-sm font-medium text-gray-600 flex items-center">
+                                    <i class="ph-bold ph-timer text-xl text-green-500 mr-2"></i> Puntualidad Promedio
+                                </p>
+                                <p class="text-4xl font-extrabold text-green-800 mt-1">98.5%</p>
+                                <p class="text-xs text-gray-500 mt-2">Puntualidad en check-in de los últimos 30 días.</p>
+                            </div>
+                            
+                            <!-- KPI: HORAS EXTRA -->
+                            <div class="bg-white p-5 rounded-xl shadow border border-gray-200">
+                                <p class="text-sm font-medium text-gray-600 flex items-center">
+                                    <i class="ph-bold ph-clock-counter-clockwise text-xl text-red-500 mr-2"></i> Total de Horas Extra
+                                </p>
+                                <p class="text-4xl font-extrabold text-red-800 mt-1">112.5 h</p>
+                                <p class="text-xs text-gray-500 mt-2">Acumuladas por el equipo este mes.</p>
+                            </div>
+
+                            <!-- KPI: SATISFACCIÓN PROMEDIO -->
+                            <div class="bg-white p-5 rounded-xl shadow border border-gray-200">
+                                <p class="text-sm font-medium text-gray-600 flex items-center">
+                                    <i class="ph-bold ph-star-fill text-xl text-yellow-500 mr-2"></i> Satisfacción (NPS)
+                                </p>
+                                <p class="text-4xl font-extrabold text-yellow-800 mt-1">4.6 / 5.0</p>
+                                <p class="text-xs text-gray-500 mt-2">Calificación promedio de clientes en el trimestre.</p>
+                            </div>
+                        </div>
+
+                        <!-- LISTADO DE BAJO RENDIMIENTO (SIMULADO) -->
+                        <div class="bg-white p-6 rounded-xl shadow border border-gray-200">
+                            <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                                <i class="ph-bold ph-warning text-red-500 mr-2"></i> Operativos con Alertas (Última Semana)
+                            </h3>
+                            <ul class="space-y-3">
+                                <li class="flex justify-between items-center p-3 bg-red-50 rounded-lg border border-red-200">
+                                    <span class="font-medium text-red-700">Javier M. (Conductor)</span>
+                                    <span class="text-sm text-red-600">2 Retrasos en Check-in</span>
+                                </li>
+                                <li class="flex justify-between items-center p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                                    <span class="font-medium text-yellow-700">Andrés P. (Aux. Bodega)</span>
+                                    <span class="text-sm text-yellow-600">1 Reporte de Tarea Incompleta</span>
+                                </li>
+                            </ul>
+                            <p class="text-xs text-gray-500 mt-4">Requiere revisión y seguimiento por parte del gestor.</p>
+                        </div>
+                    </div>
+
+                    <!-- PESTAÑA 3: GESTIÓN DE PROCESOS -->
+                    <div id="processes" class="tab-content hidden">
+                        <h2 class="text-xl font-bold mb-6 flex items-center text-gray-800">
+                            <i class="ph-bold ph-folder-open text-primary mr-2"></i> Documentación y Procesos Clave
+                        </h2>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- Enlace a Proceso 1 -->
+                            <div class="bg-white p-5 rounded-xl shadow border border-gray-200 hover:bg-gray-50 transition duration-150 cursor-pointer" 
+                                onclick="showMessageModal('Proceso de Nómina', 'Aquí iría la documentación sobre el Proceso de Aprobación de Nómina.')">
+                                <i class="ph-bold ph-file-text text-3xl text-blue-500 mb-2"></i>
+                                <h3 class="font-bold text-lg">Aprobación de Novedades de Nómina</h3>
+                                <p class="text-sm text-gray-500">Revisa y aprueba las horas extra y novedades reportadas.</p>
+                            </div>
+                            <!-- Enlace a Proceso 2 -->
+                            <div class="bg-white p-5 rounded-xl shadow border border-gray-200 hover:bg-gray-50 transition duration-150 cursor-pointer"
+                                onclick="showMessageModal('Manual de SGPO', 'Aquí iría el Manual del Sistema de Gestión de Personal Operativo (SGPO).')">
+                                <i class="ph-bold ph-book-open-text text-3xl text-purple-500 mb-2"></i>
+                                <h3 class="font-bold text-lg">Manual de Usuario SGPO (Gestor)</h3>
+                                <p class="text-sm text-gray-500">Guía completa para la utilización eficiente del sistema.</p>
+                            </div>
+                            <!-- Enlace a Proceso 3 -->
+                            <div class="bg-white p-5 rounded-xl shadow border border-gray-200 hover:bg-gray-50 transition duration-150 cursor-pointer"
+                                onclick="showMessageModal('Reporte de Incidentes', 'Aquí iría el formulario o proceso para el Reporte de Incidentes Operacionales Graves.')">
+                                <i class="ph-bold ph-hazard text-3xl text-red-500 mb-2"></i>
+                                <h3 class="font-bold text-lg">Reporte de Incidentes Operacionales</h3>
+                                <p class="text-sm text-gray-500">Procedimiento inmediato para registrar cualquier eventualidad.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PESTAÑA 4: COMUNICACIONES (CHAT SIMULADO) -->
+                    <div id="chat" class="tab-content hidden">
+                        <h2 class="text-xl font-bold mb-4 flex items-center text-gray-800">
+                            <i class="ph-bold ph-chats text-primary mr-2"></i> Chat con Operativos y Otros Gestores
+                        </h2>
+                        
+                        <!-- CONTENEDOR DE CONVERSACIONES -->
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <!-- Columna 1: Listado de Chats -->
+                            <div class="bg-gray-50 p-3 rounded-xl border border-gray-200 h-96 overflow-y-auto sm:col-span-1">
+                                <p class="text-sm font-bold text-gray-700 mb-3">Chats Recientes</p>
+                                <div class="p-3 mb-2 rounded-lg bg-white shadow-sm border border-blue-200 cursor-pointer">
+                                    <p class="font-semibold text-sm text-blue-800">Andrés P. <span class="text-xs text-primary ml-2">(1)</span></p>
+                                    <p class="text-xs text-gray-500 truncate">RE: ¿El turno del sábado cambia?</p>
+                                </div>
+                                <div class="p-3 mb-2 rounded-lg bg-white shadow-sm cursor-pointer">
+                                    <p class="font-semibold text-sm">Gerente de Logística</p>
+                                    <p class="text-xs text-gray-500 truncate">Ok, reviso el reporte mañana.</p>
+                                </div>
+                                <div class="p-3 mb-2 rounded-lg bg-white shadow-sm cursor-pointer">
+                                    <p class="font-semibold text-sm">Carolina J.</p>
+                                    <p class="text-xs text-gray-500 truncate">El equipo 4 está fallando...</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Columna 2 & 3: Ventana de Chat (Simulada) -->
+                            <div class="sm:col-span-2 bg-white p-4 rounded-xl shadow-inner border border-gray-200 flex flex-col h-96">
+                                <div class="flex-grow overflow-y-auto mb-4 space-y-3">
+                                    <div class="flex justify-start">
+                                        <div class="bg-gray-200 text-gray-800 p-3 rounded-xl rounded-tl-none max-w-xs shadow-sm">
+                                            <p class="text-sm">Hola Sofía, ¿el turno de montacargas del sábado 26 sigue programado para la Sede Central?</p>
+                                            <span class="text-xs text-gray-500 block text-right mt-1">10:30 AM</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex justify-end">
+                                        <div class="bg-indigo-500 text-white p-3 rounded-xl rounded-tr-none max-w-xs shadow-md">
+                                            <p class="text-sm">Sí, Andrés. Se mantiene igual. Te confirmo que las herramientas ya están listas.</p>
+                                            <span class="text-xs text-indigo-200 block text-right mt-1">10:35 AM</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Input de Chat -->
+                                <div class="flex">
+                                    <input type="text" placeholder="Escribe un mensaje..." class="flex-grow p-3 border border-gray-300 rounded-l-lg focus:ring-2 focus:ring-primary focus:border-primary" />
+                                    <button class="color-primary text-white p-3 rounded-r-lg hover:bg-red-700 transition duration-150" onclick="showMessageModal('Mensaje Enviado', 'Mensaje a Andrés P. simulado.')">
+                                        <i class="ph-bold ph-paper-plane-right text-xl"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <!-- MODAL (USADO PARA ALERTS) -->
+    <div id="messageModal" class="modal fixed inset-0 z-50 flex items-center justify-center hidden">
+        <div class="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full mx-4 transform transition-all">
+            <h3 id="modalTitle" class="text-xl font-bold mb-3 text-gray-800">Título</h3>
+            <p id="modalMessage" class="text-gray-600 mb-4">Mensaje</p>
+            <button 
+                class="w-full color-primary text-white py-2 rounded-lg hover:bg-red-700 transition duration-150"
+                onclick="document.getElementById('messageModal').classList.add('hidden')"
+            >
+                Aceptar
+            </button>
+        </div>
+    </div>
+
+    <!-- PIE DE PÁGINA -->
+    <footer class="bg-white border-t border-gray-200 p-3 text-center text-xs text-gray-500 mt-4">
+        <p>&copy; 2025 Zona Logística SAS | Panel de Gestión</p>
+    </footer>
+
+    <script>
+        // --- Funciones de Utilidad (Reemplazo de alert) ---
+        function showMessageModal(title, message) {
+            document.getElementById('modalTitle').innerText = title;
+            document.getElementById('modalMessage').innerText = message;
+            document.getElementById('messageModal').classList.remove('hidden');
+        }
+
+        // --- Datos Simulados de Programación Semanal (Lunes = 1, Domingo = 7) ---
+        const daysOfWeek = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+        const today = new Date();
+        const startOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + 1)); // Asumimos Lunes inicio de semana
+
+        const teamSchedule = [
+            { name: "Andrés P.", role: "Aux. Bodega", color: "blue", shifts: [
+                { day: 1, start: "6:00", end: "14:00", client: "Alfa" },
+                { day: 3, start: "8:00", end: "16:00", client: "Beta" },
+                { day: 5, start: "6:00", end: "14:00", client: "Alfa" },
+            ]},
+            { name: "Carolina J.", role: "Montacarguista", color: "teal", shifts: [
+                { day: 2, start: "7:00", end: "15:00", client: "Gamma" },
+                { day: 4, start: "7:00", end: "15:00", client: "Gamma" },
+                { day: 6, start: "9:00", end: "17:00", client: "Alfa" },
+            ]},
+            { name: "Javier M.", role: "Conductor", color: "purple", shifts: [
+                { day: 1, start: "9:00", end: "17:00", client: "Beta" },
+                { day: 2, start: "9:00", end: "17:00", client: "Beta" },
+                { day: 3, start: "9:00", end: "17:00", client: "Beta" },
+                { day: 4, start: "9:00", end: "17:00", client: "Beta" },
+            ]},
+            { name: "Diana S.", role: "Aux. Bodega", color: "blue", shifts: [
+                { day: 5, start: "14:00", end: "22:00", client: "Gamma" },
+                { day: 7, start: "8:00", end: "16:00", client: "Alfa" },
+            ]},
+        ];
+
+        // --- Lógica de Programación Semanal ---
+
+        function renderSchedule() {
+            const container = document.getElementById('scheduleContainer');
+            let html = '';
+
+            // 1. Renderizar encabezados (Nombre + Días)
+            html += '<div class="schedule-day-header font-bold text-black border-b border-gray-300">Operativo</div>';
+            daysOfWeek.forEach((dayName, index) => {
+                const date = new Date(startOfWeek);
+                date.setDate(startOfWeek.getDate() + index);
+                const dateString = `${date.getDate()}/${date.getMonth() + 1}`;
+                html += `<div class="schedule-day-header border-b border-gray-300">${dayName}<br><span class="text-xs font-normal text-gray-500">${dateString}</span></div>`;
+            });
+
+            // 2. Renderizar filas de Operativos
+            teamSchedule.forEach(operative => {
+                // Columna del Operativo
+                html += `<div class="p-2 border-r border-gray-200 bg-gray-50 flex flex-col justify-center text-sm font-semibold text-gray-800 min-h-[50px]">${operative.name} <span class="text-xs font-normal text-gray-500">${operative.role}</span></div>`;
+
+                // Columnas de Turnos por Día
+                for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+                    const dayNumber = dayIndex + 1;
+                    const shift = operative.shifts.find(s => s.day === dayNumber);
+                    
+                    let slotContent;
+                    if (shift) {
+                        // Turno Asignado
+                        slotContent = `
+                            <div 
+                                class="shift-block bg-${operative.color}-500 hover:bg-${operative.color}-600" 
+                                onclick="showShiftDetails('${operative.name}', '${daysOfWeek[dayIndex]}', '${shift.start}', '${shift.end}', '${shift.client}')"
+                                title="${shift.client} (${shift.start}-${shift.end})"
+                            >
+                                ${shift.start} - ${shift.client.substring(0, 3)}
+                            </div>
+                        `;
+                    } else {
+                        // Slot Vacío (Clic para asignar)
+                        slotContent = `
+                            <button 
+                                class="shift-unassigned hover:text-blue-600"
+                                onclick="openAssignmentModal('${operative.name}', '${daysOfWeek[dayIndex]}', '${dayNumber}')"
+                                title="Asignar Turno"
+                            >
+                                <i class="ph-bold ph-plus-circle"></i>
+                            </button>
+                        `;
+                    }
+
+                    html += `<div class="schedule-slot border-b border-gray-200">${slotContent}</div>`;
+                }
+            });
+
+            container.innerHTML = html;
+        }
+
+        // Función para mostrar detalles de un turno
+        function showShiftDetails(name, day, start, end, client) {
+            showMessageModal(
+                `Detalle del Turno`,
+                `Operativo: <strong>${name}</strong><br>
+                Día: <strong>${day}</strong><br>
+                Horario: <strong>${start} - ${end}</strong><br>
+                Cliente: <strong>${client}</strong>
+                <br><br>
+                <button class="bg-red-500 text-white py-1 px-3 rounded-lg text-xs mt-2" onclick="showMessageModal('Eliminar Turno', 'Funcionalidad para eliminar turno simulada.')">Eliminar</button>`
+            );
+        }
+
+        // Función para abrir el modal de asignación
+        function openAssignmentModal(name, day, dayNumber) {
+            showMessageModal(
+                `Asignar Turno a ${name}`,
+                `Día: <strong>${day}</strong><br>
+                <label class="block mt-3 text-sm font-medium text-gray-700">Horario (Ej: 8:00-16:00):</label>
+                <input type="text" class="w-full p-2 border rounded-lg mt-1" placeholder="Ej: 07:00 - 15:00">
+                <label class="block mt-3 text-sm font-medium text-gray-700">Cliente:</label>
+                <select class="w-full p-2 border rounded-lg mt-1">
+                    <option>Distribuidora Alfa</option>
+                    <option>Supermercados Beta</option>
+                    <option>Comercializadora Gamma</option>
+                </select>
+                <button class="bg-blue-500 text-white py-2 px-4 rounded-lg text-sm mt-4 hover:bg-blue-600 w-full" onclick="showMessageModal('Turno Creado', 'Turno creado para ${name} el ${day} (Simulación).')">
+                    Confirmar Asignación
+                </button>`
+            );
+        }
+
+        // --- Lógica de Pestañas ---
+
+        function setupTabs() {
+            const tabButtons = document.querySelectorAll('.tab-btn');
+            const tabContents = document.querySelectorAll('.tab-content');
+
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const target = button.getAttribute('data-target');
+
+                    // Resetear clases de todos los botones
+                    tabButtons.forEach(btn => btn.classList.remove('tab-active'));
+                    
+                    // Ocultar todos los contenidos
+                    tabContents.forEach(content => content.classList.add('hidden'));
+
+                    // Activar la pestaña y mostrar el contenido correspondiente
+                    button.classList.add('tab-active');
+                    document.getElementById(target).classList.remove('hidden');
+                });
+            });
+        }
+
+        // --- Inicialización General ---
+        
+        window.onload = () => {
+            setupTabs();
+            renderSchedule();
+            // Exponer funciones al scope global
+            window.showMessageModal = showMessageModal;
+            window.showShiftDetails = showShiftDetails;
+            window.openAssignmentModal = openAssignmentModal;
+        };
+    </script>
+</body>
+</html>

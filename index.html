@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGPO - Gestión Operativa</title>
+    <!-- Carga de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <!-- Iconos Phosphor Icons para un look profesional -->
+    <script src="https://unpkg.com/phosphor-icons"></script>
+    <style>
+        /* Definición de la fuente Inter y colores de la marca */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f7f7; /* Blanco roto para el fondo */
+        }
+        /* Color principal de la marca: Rojo fuerte */
+        .color-primary {
+            background-color: #e53e3e; /* Rojo Tailwind 600 */
+        }
+        .text-primary {
+            color: #e53e3e; /* Rojo Tailwind 600 */
+        }
+        .color-secondary {
+            background-color: #1a1a1a; /* Negro casi total */
+        }
+        /* Estilo para los botones con efecto burbuja */
+        .btn-llm {
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s ease;
+        }
+        .btn-llm::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 5px;
+            height: 5px;
+            background: rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            opacity: 0;
+            transform: translate(-50%, -50%);
+        }
+        .btn-llm:focus::after, .btn-llm:hover::after {
+            animation: ripple 0.6s linear;
+        }
+        @keyframes ripple {
+            0% {
+                width: 5px;
+                height: 5px;
+                opacity: 0.5;
+            }
+            100% {
+                width: 200%;
+                height: 200%;
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased">
+
+    <!-- Configuración e Importaciones de Firebase (Simuladas) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // Variables globales MANDATORIAS proporcionadas por Canvas
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : undefined;
+
+        let app, db, auth;
+
+        // Función de inicialización y autenticación
+        async function initializeFirebase() {
+            try {
+                if (Object.keys(firebaseConfig).length > 0) {
+                    app = initializeApp(firebaseConfig);
+                    db = getFirestore(app);
+                    auth = getAuth(app);
+
+                    // Autenticación usando el token o anónima
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                        console.log("Firebase: Autenticación con token exitosa.");
+                    } else {
+                        await signInAnonymously(auth);
+                        console.log("Firebase: Autenticación anónima exitosa.");
+                    }
+                    window.sgpo_db = db; // Exportar para uso en scripts
+                    window.sgpo_auth = auth;
+                    window.sgpo_userId = auth.currentUser?.uid || crypto.randomUUID();
+                } else {
+                    console.warn("Firebase: Configuración no encontrada. Las funciones de DB no estarán disponibles.");
+                }
+            } catch (error) {
+                console.error("Firebase: Error al inicializar o autenticar:", error);
+            }
+        }
+
+        initializeFirebase();
+    </script>
+    
+    <!-- CABECERA/NAVBAR -->
+    <header class="bg-white shadow-md sticky top-0 z-10">
+        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <!-- Logo o Nombre del Sistema -->
+            <div id="navTitle" class="text-2xl font-extrabold tracking-tight cursor-pointer" onclick="showWelcomeScreen()">
+                <span class="text-black">SGPO</span> <span class="text-primary">Zona Logística</span>
+            </div>
+            
+            <!-- Botones de Navegación -->
+            <nav>
+                <button 
+                    id="loginButtonHeader"
+                    class="color-primary text-white font-semibold py-2 px-6 rounded-lg transition duration-300 ease-in-out hover:bg-red-700 shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-red-300 focus:ring-opacity-50"
+                >
+                    <i class="ph-bold ph-sign-in text-lg mr-2"></i>
+                    Iniciar Sesión
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- CONTENIDO PRINCIPAL - CENTRADO -->
+    <main id="mainContent" class="flex-grow flex items-center justify-center p-6 transition-all duration-300">
+        <!-- Contenedor general para el contenido dinámico -->
+        <div id="contentContainer" class="w-full max-w-4xl">
+            <!-- Contenido inicial (Bienvenida) -->
+            <div id="welcomeScreen" class="max-w-4xl text-center mx-auto">
+                <h1 class="text-6xl font-extrabold text-black mb-6 leading-tight">
+                    Optimiza la Gestión del <span class="text-primary">Personal Operativo</span>
+                </h1>
+                <p class="text-xl text-gray-700 mb-10">
+                    Sistema de Gestión de Personal Operativo de Zona Logística SAS, asegura la precisión y centraliza los registros de tiempo. ¡Digitaliza tu operación!
+                </p>
+                
+                <!-- Botón de Llamada a la Acción Principal -->
+                <button 
+                    id="loginButtonMain"
+                    class="color-primary text-white font-bold text-lg py-3 px-10 rounded-xl transition duration-300 ease-in-out hover:bg-red-700 shadow-2xl hover:shadow-red-500/50 focus:outline-none focus:ring-4 focus:ring-red-300 focus:ring-opacity-50 transform hover:scale-105"
+                >
+                    Acceder al Sistema
+                </button>
+            </div>
+            
+            <!-- Contenedor del formulario de Login (Inicialmente oculto) -->
+            <div id="loginFormContainer" class="hidden mx-auto w-full max-w-md">
+                <!-- El formulario de login se inyecta aquí por JS -->
+            </div>
+
+            <!-- Contenedor del Dashboard (Inicialmente oculto) -->
+            <div id="dashboardContainer" class="hidden w-full">
+                <!-- El dashboard se inyecta aquí por JS -->
+            </div>
+        </div>
+
+    </main>
+
+    <!-- PIE DE PÁGINA -->
+    <footer class="bg-black text-white p-4 text-center">
+        <p class="text-sm">&copy; 2025 Zona Logística SAS | Sistema de Gestión de Personal Operativo</p>
+    </footer>
+
+    <script>
+        // Variables de entorno de la API de Gemini (dejar en blanco)
+        const GEMINI_API_KEY = "";
+        const GEMINI_API_URL_FLASH = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${GEMINI_API_KEY}`;
+        
+        // Datos simulados para los gráficos (50% es la base mínima, 100% es el máximo)
+        const simulatedClients = [
+            { id: 1, name: "Distribuidora Alfa", data: [65, 70, 75, 80, 85, 90] },
+            { id: 2, name: "Supermercados Beta", data: [70, 72, 74, 73, 75, 76] },
+            { id: 3, name: "Comercializadora Gamma", data: [80, 85, 90, 92, 95, 98] }
+        ];
+
+        // --- Referencias de DOM ---
+        const welcomeScreen = document.getElementById('welcomeScreen');
+        const loginFormContainer = document.getElementById('loginFormContainer');
+        const dashboardContainer = document.getElementById('dashboardContainer');
+        const loginButtonHeader = document.getElementById('loginButtonHeader');
+        const loginButtonMain = document.getElementById('loginButtonMain');
+        const contentContainer = document.getElementById('contentContainer');
+        const mainContent = document.getElementById('mainContent');
+        let currentView = 'kpis'; // Estado para la navegación por pestañas
+
+        // --- Funciones de Navegación ---
+
+        const showWelcomeScreen = () => {
+            welcomeScreen.classList.remove('hidden');
+            loginFormContainer.classList.add('hidden');
+            dashboardContainer.classList.add('hidden');
+            loginButtonHeader.classList.remove('hidden'); // Asegura que el botón de login esté visible
+            loginButtonHeader.textContent = 'Iniciar Sesión';
+            loginButtonHeader.onclick = showLoginForm;
+            // Ajustar el centrado para la pantalla de bienvenida
+            contentContainer.classList.remove('max-w-7xl');
+            contentContainer.classList.add('max-w-4xl');
+            mainContent.classList.add('items-center');
+        };
+
+        const showLoginForm = () => {
+            welcomeScreen.classList.add('hidden');
+            dashboardContainer.classList.add('hidden');
+            loginFormContainer.innerHTML = generateLoginForm();
+            loginFormContainer.classList.remove('hidden');
+            loginButtonHeader.classList.add('hidden'); // Ocultar el botón de login en la vista de login
+        };
+
+        const showDashboard = (email) => {
+            welcomeScreen.classList.add('hidden');
+            loginFormContainer.classList.add('hidden');
+            dashboardContainer.innerHTML = generateDashboard(email);
+            dashboardContainer.classList.remove('hidden');
+            
+            // Mostrar la vista inicial de KPIs por defecto
+            showDashboardView('kpis');
+
+            // Actualizar el botón de la cabecera para Logout
+            loginButtonHeader.classList.remove('hidden');
+            loginButtonHeader.innerHTML = '<i class="ph-bold ph-sign-out text-lg mr-2"></i> Cerrar Sesión';
+            loginButtonHeader.onclick = showWelcomeScreen;
+            
+            // Ajustar el layout para el dashboard (más ancho)
+            contentContainer.classList.remove('max-w-4xl');
+            contentContainer.classList.add('max-w-7xl');
+            mainContent.classList.remove('items-center');
+            
+            // Setup listeners after the dashboard is rendered
+            setupGeminiListeners();
+            document.getElementById('kpisTabBtn').addEventListener('click', () => showDashboardView('kpis'));
+            document.getElementById('aiTabBtn').addEventListener('click', () => showDashboardView('aiTools'));
+            
+            // Inicializar el selector de clientes y el gráfico de satisfacción individual
+            setupClientSatisfaction();
+        };
+        
+        // Función para cambiar entre pestañas del Dashboard
+        const showDashboardView = (view) => {
+            currentView = view;
+            
+            const kpisContent = document.getElementById('kpisContent');
+            const aiToolsContent = document.getElementById('aiToolsContent');
+            const kpisTabBtn = document.getElementById('kpisTabBtn');
+            const aiTabBtn = document.getElementById('aiTabBtn');
+
+            if (kpisContent && aiToolsContent && kpisTabBtn && aiTabBtn) {
+                // Ocultar/Mostrar Contenido
+                kpisContent.classList.toggle('hidden', view !== 'kpis');
+                aiToolsContent.classList.toggle('hidden', view !== 'aiTools');
+
+                // Actualizar estilo de Pestañas
+                const activeClass = 'bg-gray-50 text-primary border-b-2 border-primary';
+                const inactiveClass = 'text-gray-600 hover:bg-gray-100 border-b border-gray-200';
+                
+                kpisTabBtn.className = `py-3 px-6 -mb-px font-semibold transition duration-200 ${view === 'kpis' ? activeClass : inactiveClass}`;
+                aiTabBtn.className = `py-3 px-6 -mb-px font-semibold transition duration-200 ${view === 'aiTools' ? activeClass : inactiveClass}`;
+            }
+        };
+
+
+        // --- Generación de Vistas ---
+
+        const generateLoginForm = () => {
+            return `
+                <div class="bg-white p-8 sm:p-10 rounded-xl shadow-2xl border-t-8 border-primary w-full">
+                    <h2 class="text-3xl font-bold text-black text-center mb-2">
+                        Bienvenido a SGPO
+                    </h2>
+                    <p class="text-gray-500 text-center mb-8">
+                        Ingresa tus credenciales para continuar.
+                    </p>
+
+                    <form id="authForm" onsubmit="handleLogin(event)">
+                        <!-- Campo de Correo Electrónico -->
+                        <div class="mb-5">
+                            <label for="email" class="block text-sm font-medium text-gray-700 mb-1">
+                                Correo Electrónico
+                            </label>
+                            <input 
+                                type="email" 
+                                id="email" 
+                                name="email" 
+                                placeholder="ej. admin@logistica.com"
+                                required 
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition duration-150 ease-in-out"
+                            >
+                        </div>
+
+                        <!-- Campo de Contraseña -->
+                        <div class="mb-6">
+                            <label for="password" class="block text-sm font-medium text-gray-700 mb-1">
+                                Contraseña
+                            </label>
+                            <input 
+                                type="password" 
+                                id="password" 
+                                name="password" 
+                                placeholder="••••••••"
+                                required 
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition duration-150 ease-in-out"
+                            >
+                        </div>
+                        
+                        <!-- Mensaje de error/éxito -->
+                        <p id="messageBox" class="text-center text-sm font-semibold mb-4 text-gray-600 hidden"></p>
+
+                        <!-- Botón de Acceso -->
+                        <button 
+                            type="submit" 
+                            class="w-full color-primary text-white font-bold py-3 rounded-lg transition duration-300 ease-in-out hover:bg-red-700 shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-red-300 focus:ring-opacity-50"
+                        >
+                            Acceder
+                        </button>
+                    </form>
+                    
+                    <p class="mt-4 text-center text-sm text-gray-500">
+                        Credenciales de prueba: admin@logistica.com / 12345
+                    </p>
+                </div>
+            `;
+        };
+        
+        const generateDashboard = (email) => {
+            return `
+                <div class="bg-white rounded-xl shadow-2xl p-0 md:p-8 w-full">
+                    <h1 class="text-3xl font-extrabold text-black mb-1 px-6 md:px-0 pt-6 md:pt-0">Panel de Control SGPO</h1>
+                    <p class="text-gray-600 mb-6 border-b pb-4 px-6 md:px-0">Bienvenido, Gestor: <span class="text-primary font-semibold">${email}</span>.</p>
+
+                    <!-- Pestañas de Navegación -->
+                    <div class="flex border-b border-gray-200">
+                        <button id="kpisTabBtn" class="py-3 px-6 -mb-px font-semibold transition duration-200" data-view="kpis">
+                            <i class="ph-bold ph-chart-bar text-lg mr-2"></i> Indicadores Operacionales
+                        </button>
+                        <button id="aiTabBtn" class="py-3 px-6 -mb-px font-semibold transition duration-200" data-view="aiTools">
+                            <i class="ph-bold ph-robot text-lg mr-2"></i> Herramientas de IA
+                        </button>
+                    </div>
+
+                    <!-- Contenido de Indicadores Operacionales (KPIs) -->
+                    <div id="kpisContent" class="p-6 bg-gray-50 rounded-b-xl border border-t-0 border-gray-200">
+                        <h2 class="text-2xl font-bold text-black mb-6">Métricas de Flujo de Trabajo y Volumen (Simulación)</h2>
+                        
+                        <!-- Tarjetas de KPIs -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                            <!-- KPI 1: Cumplimiento de Turnos -->
+                            <div class="bg-green-100 p-4 rounded-xl shadow border border-green-300">
+                                <i class="ph-bold ph-check-square-offset text-3xl text-green-700 mb-2"></i>
+                                <p class="text-sm font-medium text-gray-600">Cumplimiento de Turnos</p>
+                                <p class="text-3xl font-extrabold text-green-800">98.5%</p>
+                                <p class="text-xs text-green-600 mt-1"><i class="ph-bold ph-arrow-up-right"></i> Estabilidad</p>
+                            </div>
+                            <!-- KPI 2: Operaciones Activas Hoy -->
+                            <div class="bg-blue-100 p-4 rounded-xl shadow border border-blue-300">
+                                <i class="ph-bold ph-users-three text-3xl text-blue-700 mb-2"></i>
+                                <p class="text-sm font-medium text-gray-600">Operativos Activos (Total)</p>
+                                <p class="text-3xl font-extrabold text-blue-800">1.240</p>
+                                <p class="text-xs text-blue-600 mt-1"><i class="ph-bold ph-arrow-up"></i> +4% vs mes anterior</p>
+                            </div>
+                            <!-- KPI 3: Operaciones Pendientes (Hoy) -->
+                            <div class="bg-yellow-100 p-4 rounded-xl shadow border border-yellow-300">
+                                <i class="ph-bold ph-calendar-x text-3xl text-yellow-700 mb-2"></i>
+                                <p class="text-sm font-medium text-gray-600">Operaciones Pendientes (Hoy)</p>
+                                <p class="text-3xl font-extrabold text-yellow-800">45</p>
+                                <p class="text-xs text-yellow-600 mt-1"><i class="ph-bold ph-trend-down"></i> -10% vs ayer</p>
+                            </div>
+                            <!-- KPI 4: Operaciones para Mañana -->
+                            <div class="bg-red-100 p-4 rounded-xl shadow border border-red-300">
+                                <i class="ph-bold ph-calendar-plus text-3xl text-red-700 mb-2"></i>
+                                <p class="text-sm font-medium text-gray-600">Operaciones para Mañana</p>
+                                <p class="text-3xl font-extrabold text-red-800">1.350</p>
+                                <p class="text-xs text-red-600 mt-1"><i class="ph-bold ph-arrow-up-right"></i> +8% vs promedio</p>
+                            </div>
+                        </div>
+
+                        <!-- GRÁFICOS DE LÍNEA DE TIEMPO Y SATISFACCIÓN GLOBAL -->
+                        <div class="grid lg:grid-cols-2 gap-8">
+                            
+                            <!-- Gráfico 1: Evolución de Operaciones (Cantidad) -->
+                            <div class="bg-white p-6 rounded-xl shadow border border-gray-200">
+                                <h3 class="text-xl font-bold text-black mb-4 flex items-center">
+                                    <i class="ph-bold ph-chart-line text-primary mr-2"></i> Evolución de Cantidad de Operaciones (Mes a Mes)
+                                </h3>
+                                <!-- SIMULACIÓN DE GRÁFICO DE LÍNEA (5k-15k) -->
+                                <div class="h-64 relative">
+                                    <svg viewBox="0 0 100 100" class="w-full h-full" preserveAspectRatio="none">
+                                        <!-- Eje Y (Cantidades) -->
+                                        <text x="-1" y="5" font-size="5" fill="#9CA3AF">15k</text>
+                                        <text x="-1" y="50" font-size="5" fill="#9CA3AF">10k</text>
+                                        <text x="-1" y="95" font-size="5" fill="#9CA3AF">5k</text>
+                                        
+                                        <!-- Líneas de cuadrícula -->
+                                        <line x1="0" y1="50" x2="100" y2="50" stroke="#E5E7EB" stroke-dasharray="2" stroke-width="0.5" />
+                                        
+                                        <!-- Línea de Operaciones (Creciente, indicando más uso del sistema) -->
+                                        <polyline 
+                                            fill="none" 
+                                            stroke="#10B981" /* Verde para crecimiento */
+                                            stroke-width="2" 
+                                            points="0,95 20,80 40,65 60,40 80,25 100,5" 
+                                            class="transition-all duration-1000"
+                                        />
+                                        <circle cx="0" cy="95" r="2" fill="#10B981" />
+                                        <circle cx="20" cy="80" r="2" fill="#10B981" />
+                                        <circle cx="40" cy="65" r="2" fill="#10B981" />
+                                        <circle cx="60" cy="40" r="2" fill="#10B981" />
+                                        <circle cx="80" cy="25" r="2" fill="#10B981" />
+                                        <circle cx="100" cy="5" r="2" fill="#10B981" />
+                                    </svg>
+                                </div>
+                                <div class="flex justify-between text-xs text-gray-600 pt-2 border-t mt-1">
+                                    <span>Ene</span>
+                                    <span>Mar</span>
+                                    <span>May</span>
+                                    <span>Jul</span>
+                                    <span>Sep</span>
+                                    <span>Nov</span>
+                                </div>
+                                <p class="text-center text-xs text-gray-400 mt-2">Indica el volumen de personal gestionado con SGPO.</p>
+                            </div>
+
+                            <!-- Gráfico 2: Satisfacción de Clientes General -->
+                            <div class="bg-white p-6 rounded-xl shadow border border-gray-200">
+                                <h3 class="text-xl font-bold text-black mb-4 flex items-center">
+                                    <i class="ph-bold ph-smiley text-primary mr-2"></i> Satisfacción General del Cliente (Promedio)
+                                </h3>
+                                <!-- SIMULACIÓN DE GRÁFICO DE LÍNEA (50%-100%) -->
+                                <div class="h-64 relative">
+                                     <svg viewBox="0 0 100 100" class="w-full h-full" preserveAspectRatio="none">
+                                        <!-- Eje Y (Porcentaje: 100% en Y=5, 50% en Y=95) -->
+                                        <text x="-1" y="5" font-size="5" fill="#9CA3AF">100%</text>
+                                        <text x="-1" y="50" font-size="5" fill="#9CA3AF">75%</text>
+                                        <text x="-1" y="95" font-size="5" fill="#9CA3AF">50%</text>
+
+                                        <!-- Líneas de cuadrícula -->
+                                        <line x1="0" y1="50" x2="100" y2="50" stroke="#E5E7EB" stroke-dasharray="2" stroke-width="0.5" />
+                                        <line x1="0" y1="5" x2="100" y2="5" stroke="#E5E7EB" stroke-dasharray="2" stroke-width="0.5" />
+
+                                        <!-- Línea de Satisfacción (Subiendo mes a mes) -->
+                                        <!-- Puntos basados en la escala: 65, 75, 80, 85, 90, 95 -->
+                                        <polyline 
+                                            fill="none" 
+                                            stroke="#06B6D4" /* Cian para satisfacción */
+                                            stroke-width="2" 
+                                            points="0,62 20,44 40,35 60,26 80,17 100,8" 
+                                            class="transition-all duration-1000"
+                                        />
+                                        <!-- Puntos fijos para esta simulación -->
+                                        <circle cx="0" cy="62" r="2" fill="#06B6D4" />
+                                        <circle cx="20" cy="44" r="2" fill="#06B6D4" />
+                                        <circle cx="40" cy="35" r="2" fill="#06B6D4" />
+                                        <circle cx="60" cy="26" r="2" fill="#06B6D4" />
+                                        <circle cx="80" cy="17" r="2" fill="#06B6D4" />
+                                        <circle cx="100" cy="8" r="2" fill="#06B6D4" />
+                                    </svg>
+                                </div>
+                                <div class="flex justify-between text-xs text-gray-600 pt-2 border-t mt-1">
+                                    <span>Ene</span>
+                                    <span>Mar</span>
+                                    <span>May</span>
+                                    <span>Jul</span>
+                                    <span>Sep</span>
+                                    <span>Nov</span>
+                                </div>
+                                <p class="text-center text-xs text-gray-400 mt-2">Muestra la tendencia positiva en la calidad del servicio.</p>
+                            </div>
+                        </div>
+
+                        <!-- GRÁFICO DE SATISFACCIÓN POR CLIENTE (INTERACTIVO) -->
+                        <div class="mt-8 bg-white p-6 rounded-xl shadow border border-gray-200">
+                            <h3 class="text-xl font-bold text-black mb-4 flex items-center">
+                                <i class="ph-bold ph-address-book text-primary mr-2"></i> Desempeño Individual de Clientes
+                            </h3>
+                            
+                            <div class="flex flex-col md:flex-row gap-4 mb-4 items-center">
+                                <label for="clientSelector" class="font-medium text-gray-700">Seleccionar Cliente:</label>
+                                <select id="clientSelector" onchange="drawClientSatisfactionGraph(this.value)" class="flex-grow max-w-xs px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-primary focus:border-primary">
+                                    <!-- Options injected by JS -->
+                                </select>
+                                <p id="clientScore" class="text-lg font-bold text-gray-800"></p>
+                            </div>
+
+                            <div class="h-64 relative border border-gray-100 rounded-lg p-2">
+                                <svg id="clientSatisfactionGraph" viewBox="0 0 100 100" class="w-full h-full" preserveAspectRatio="none">
+                                    <!-- Eje Y (Porcentaje: 100% en Y=5, 50% en Y=95) -->
+                                    <text x="-1" y="5" font-size="5" fill="#9CA3AF">100%</text>
+                                    <text x="-1" y="50" font-size="5" fill="#9CA3AF">75%</text>
+                                    <text x="-1" y="95" font-size="5" fill="#9CA3AF">50%</text>
+                                    
+                                    <!-- Líneas de cuadrícula para el gráfico interactivo -->
+                                    <line x1="0" y1="50" x2="100" y2="50" stroke="#E5E7EB" stroke-dasharray="2" stroke-width="0.5" />
+                                    <line x1="0" y1="5" x2="100" y2="5" stroke="#E5E7EB" stroke-dasharray="2" stroke-width="0.5" />
+                                    
+                                    <g id="clientGraphContent">
+                                        <!-- Graph content injected by JS -->
+                                    </g>
+                                </svg>
+                            </div>
+                            <div class="flex justify-between text-xs text-gray-600 pt-2 border-t mt-1">
+                                <span>Mes 1</span>
+                                <span>Mes 2</span>
+                                <span>Mes 3</span>
+                                <span>Mes 4</span>
+                                <span>Mes 5</span>
+                                <span>Mes 6</span>
+                            </div>
+                            <p class="text-center text-xs text-gray-400 mt-2">Satisfacción mensual del cliente seleccionado.</p>
+                        </div>
+
+                    </div>
+
+                    <!-- Contenido de Herramientas de IA (Gemini Features) -->
+                    <div id="aiToolsContent" class="p-6 hidden bg-gray-50 rounded-b-xl border border-t-0 border-gray-200">
+                        <div class="grid md:grid-cols-2 gap-8">
+                            <!-- Columna de Generación de Tareas (Feature Gemini 1) -->
+                            <div class="bg-white p-6 rounded-xl shadow border border-gray-200">
+                                <h2 class="text-2xl font-bold text-black flex items-center mb-4">
+                                    <i class="ph-bold ph-robot text-primary mr-3 text-2xl"></i>
+                                    ✨ Generador Inteligente de Tareas
+                                </h2>
+                                <p class="text-sm text-gray-600 mb-4">Ingresa un rol operativo y Gemini te proporcionará una lista detallada de responsabilidades para ese puesto, facilitando la creación de nuevos turnos.</p>
+                                
+                                <label for="roleInput" class="block text-sm font-medium text-gray-700 mb-1">
+                                    Rol Operativo (ej. "Auxiliar de Bodega")
+                                </label>
+                                <input 
+                                    type="text" 
+                                    id="roleInput" 
+                                    placeholder="Ej. Conductor de Montacargas"
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
+                                >
+                                
+                                <button 
+                                    id="generateTasksBtn"
+                                    class="btn-llm w-full color-primary text-white font-bold py-3 rounded-lg transition hover:bg-red-700 focus:outline-none"
+                                >
+                                    <i class="ph-bold ph-magic-wand text-lg mr-2"></i> Generar Lista de Tareas
+                                </button>
+
+                                <div id="tasksResult" class="mt-5 p-4 bg-gray-50 border border-dashed border-gray-300 rounded-lg min-h-[100px] text-gray-700">
+                                    <!-- Resultado de Gemini se inyecta aquí -->
+                                    <p class="text-sm text-gray-400">Las tareas generadas aparecerán aquí.</p>
+                                </div>
+                                <div id="tasksLoading" class="hidden mt-4 text-center text-primary font-semibold">
+                                    <i class="ph-bold ph-gear-six animate-spin mr-2"></i> Generando tareas...
+                                </div>
+                            </div>
+
+                            <!-- Columna de Resumen de Correo (Feature Gemini 2) -->
+                            <div class="bg-white p-6 rounded-xl shadow border border-gray-200">
+                                <h2 class="text-2xl font-bold text-black flex items-center mb-4">
+                                    <i class="ph-bold ph-file-text-bold text-primary mr-3 text-2xl"></i>
+                                    ✨ Resumidor de Solicitudes (Email)
+                                </h2>
+                                <p class="text-sm text-gray-600 mb-4">Pega una solicitud de personal o un correo extenso y obtén un resumen conciso y estructurado de las necesidades.</p>
+                                
+                                <label for="emailInput" class="block text-sm font-medium text-gray-700 mb-1">
+                                    Texto de la Solicitud (Email o Mensaje)
+                                </label>
+                                <textarea
+                                    id="emailInput"
+                                    rows="5"
+                                    placeholder="Pega el texto de la solicitud de personal aquí..."
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
+                                ></textarea>
+                                
+                                <button 
+                                    id="summarizeEmailBtn"
+                                    class="btn-llm w-full color-secondary text-white font-bold py-3 rounded-lg transition hover:bg-black focus:outline-none"
+                                >
+                                    <i class="ph-bold ph-brain text-lg mr-2"></i> Resumir Petición
+                                </button>
+
+                                <div id="summaryResult" class="mt-5 p-4 bg-gray-50 border border-dashed border-gray-300 rounded-lg min-h-[100px] text-gray-700">
+                                    <!-- Resultado de Gemini se inyecta aquí -->
+                                    <p class="text-sm text-gray-400">El resumen ejecutivo aparecerá aquí.</p>
+                                </div>
+                                <div id="summaryLoading" class="hidden mt-4 text-center text-primary font-semibold">
+                                    <i class="ph-bold ph-gear-six animate-spin mr-2"></i> Resumiendo...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            `;
+        };
+        
+        // --- Lógica de Gráfico de Satisfacción por Cliente ---
+        
+        function setupClientSatisfaction() {
+            const selector = document.getElementById('clientSelector');
+            if (!selector) return;
+
+            // Llenar el selector con los clientes simulados
+            simulatedClients.forEach((client, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = client.name;
+                selector.appendChild(option);
+            });
+
+            // Dibujar el gráfico del primer cliente al cargar
+            if (simulatedClients.length > 0) {
+                drawClientSatisfactionGraph(0);
+            }
+        }
+
+        function drawClientSatisfactionGraph(clientIndex) {
+            const client = simulatedClients[clientIndex];
+            const graphContent = document.getElementById('clientGraphContent');
+            const clientScore = document.getElementById('clientScore');
+
+            if (!client || !graphContent) return;
+            
+            // Mostrar la puntuación más reciente
+            const latestScore = client.data[client.data.length - 1];
+            clientScore.textContent = `Puntuación más reciente: ${latestScore}%`;
+
+            // Normalizar y calcular los puntos
+            // Rango de Datos: [50, 100] -> Rango de SVG Y: [95, 5]
+            const dataPoints = client.data.map((score, index) => {
+                const x = (index / (client.data.length - 1)) * 100; // Mapea el índice al eje X (0 a 100)
+                
+                // Mapeo del Score a la coordenada Y:
+                // 1. Normalizar el score al rango [0, 1] dentro de la base [50, 100]
+                const normalizedScore = (score - 50) / 50; 
+                
+                // 2. Mapear al rango Y [95, 5] (90 unidades de alto)
+                // 95 (bottom/50%) - (normalizedScore * 90)
+                const y = 95 - (normalizedScore * 90); 
+                
+                return { x, y };
+            });
+
+            // Generar la línea de polilínea
+            const pointsString = dataPoints.map(p => `${p.x},${p.y}`).join(' ');
+            
+            // Generar los círculos de puntos
+            const circlesHtml = dataPoints.map(p => 
+                `<circle cx="${p.x}" cy="${p.y}" r="2" fill="#e53e3e" />`
+            ).join('');
+
+            // Inyectar el contenido en el SVG
+            graphContent.innerHTML = `
+                <polyline 
+                    fill="none" 
+                    stroke="#e53e3e" 
+                    stroke-width="2" 
+                    points="${pointsString}" 
+                    class="transition-all duration-1000"
+                />
+                ${circlesHtml}
+            `;
+        }
+
+        // Exponer la función al scope global
+        window.drawClientSatisfactionGraph = drawClientSatisfactionGraph;
+
+
+        // --- Lógica de Autenticación (Simulada) ---
+
+        const handleLogin = (event) => {
+            event.preventDefault();
+            const messageBox = document.getElementById('messageBox');
+            messageBox.classList.remove('hidden', 'text-green-600', 'text-red-600');
+            messageBox.classList.add('text-black');
+            messageBox.textContent = 'Verificando credenciales...';
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            // Simulación de credenciales de administrador/gestor
+            setTimeout(() => {
+                if (email === "admin@logistica.com" && password === "12345") {
+                    messageBox.textContent = '¡Acceso concedido! Redireccionando al panel...';
+                    messageBox.classList.remove('text-black');
+                    messageBox.classList.add('text-green-600');
+                    
+                    setTimeout(() => {
+                        showDashboard(email);
+                    }, 1000);
+
+                } else {
+                    messageBox.textContent = 'Error: Credenciales inválidas. Inténtalo de nuevo.';
+                    messageBox.classList.remove('text-black');
+                    messageBox.classList.add('text-red-600');
+                }
+            }, 1500);
+        };
+
+        // --- Lógica de Integración Gemini API ---
+
+        /**
+         * Realiza una llamada al API de Gemini con reintento (exponential backoff).
+         */
+        async function callGeminiApi(prompt, systemInstruction, retries = 3) {
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }],
+                systemInstruction: {
+                    parts: [{ text: systemInstruction }]
+                },
+            };
+
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(GEMINI_API_URL_FLASH, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.status === 429 && i < retries - 1) {
+                        // Implementación de backoff exponencial (1s, 2s, 4s)
+                        const delay = Math.pow(2, i) * 1000;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        continue;
+                    }
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    const text = result.candidates?.[0]?.content?.parts?.[0]?.text || "Error: No se pudo obtener la respuesta del modelo.";
+                    return text;
+
+                } catch (error) {
+                    if (i === retries - 1) {
+                        console.error("Error final al llamar a la API de Gemini:", error);
+                        throw new Error("Fallo la conexión con la IA después de varios intentos.");
+                    }
+                }
+            }
+        }
+
+
+        // Función para generar tareas
+        const generateTasks = async () => {
+            const roleInput = document.getElementById('roleInput');
+            const tasksResult = document.getElementById('tasksResult');
+            const tasksLoading = document.getElementById('tasksLoading');
+            const role = roleInput.value.trim();
+
+            if (!role) {
+                tasksResult.innerHTML = '<p class="text-red-500 font-semibold">Por favor, ingresa el nombre de un rol.</p>';
+                return;
+            }
+
+            tasksResult.innerHTML = '';
+            tasksLoading.classList.remove('hidden');
+
+            const systemPrompt = `Eres un experto en gestión operativa y logística. Tu tarea es generar una lista de 5 a 7 responsabilidades o tareas clave para el puesto operativo proporcionado. Responde únicamente con una lista numerada en español. Sé conciso y profesional.`;
+            const userPrompt = `Genera la lista de tareas para el puesto: ${role}`;
+
+            try {
+                const result = await callGeminiApi(userPrompt, systemPrompt);
+                tasksResult.innerHTML = `<pre class="whitespace-pre-wrap">${result}</pre>`;
+            } catch (error) {
+                tasksResult.innerHTML = `<p class="text-red-500 font-semibold">Error al generar tareas: ${error.message}</p>`;
+            } finally {
+                tasksLoading.classList.add('hidden');
+            }
+        };
+
+        // Función para resumir email/texto
+        const summarizeEmail = async () => {
+            const emailInput = document.getElementById('emailInput');
+            const summaryResult = document.getElementById('summaryResult');
+            const summaryLoading = document.getElementById('summaryLoading');
+            const text = emailInput.value.trim();
+
+            if (!text) {
+                summaryResult.innerHTML = '<p class="text-red-500 font-semibold">Por favor, pega el texto de la solicitud para resumir.</p>';
+                return;
+            }
+
+            summaryResult.innerHTML = '';
+            summaryLoading.classList.remove('hidden');
+
+            const systemPrompt = `Eres un asistente de personal logístico. Tu tarea es analizar una solicitud de personal (que puede ser un correo largo) y extraer un resumen ejecutivo de máximo tres puntos clave: 1. El tipo de personal solicitado o el problema principal. 2. La cantidad (si se menciona). 3. El tiempo o turno requerido (si se menciona). Responde únicamente con un encabezado en negrita seguido de la lista de puntos.`;
+            const userPrompt = `Analiza y resume esta solicitud: ${text}`;
+
+            try {
+                const result = await callGeminiApi(userPrompt, systemPrompt);
+                summaryResult.innerHTML = `<pre class="whitespace-pre-wrap">${result}</pre>`;
+            } catch (error) {
+                summaryResult.innerHTML = `<p class="text-red-500 font-semibold">Error al resumir: ${error.message}</p>`;
+            } finally {
+                summaryLoading.classList.add('hidden');
+            }
+        };
+
+
+        // --- Inicialización y Escuchadores ---
+
+        // Función para configurar los escuchadores de eventos de Gemini después de cargar el dashboard
+        const setupGeminiListeners = () => {
+            // Se debe asegurar que los elementos existan antes de añadir el listener
+            const generateTasksBtn = document.getElementById('generateTasksBtn');
+            const summarizeEmailBtn = document.getElementById('summarizeEmailBtn');
+            
+            if (generateTasksBtn) {
+                generateTasksBtn.removeEventListener('click', generateTasks); // Prevenir duplicados
+                generateTasksBtn.addEventListener('click', generateTasks);
+            }
+            if (summarizeEmailBtn) {
+                summarizeEmailBtn.removeEventListener('click', summarizeEmail); // Prevenir duplicados
+                summarizeEmailBtn.addEventListener('click', summarizeEmail);
+            }
+        };
+
+
+        // Escuchadores iniciales
+        loginButtonHeader.addEventListener('click', showLoginForm);
+        if (loginButtonMain) {
+            loginButtonMain.addEventListener('click', showLoginForm);
+        }
+        
+        // Exponer la función de login al scope global para que el formulario la pueda llamar
+        window.handleLogin = handleLogin;
+    </script>
+</body>
+</html>
